@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="pl">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Kamera → Przytnij → Wyślij do n8n</title>
+
+    <!-- Cropper.js -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css"
+    />
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      :root {
+        --bar-bg: #111;
+        --bar-fg: #f5f5f5;
+        --accent: #ffd54a;
+        --muted: #8a8a8a;
+        --border: #2a2a2a;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        background: #000;
+        color: #ddd;
+        font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        min-height: 100svh;
+      }
+
+      /* Górny pasek narzędzi */
+      .toolbar {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.6rem 0.8rem;
+        background: var(--bar-bg);
+        border-bottom: 1px solid var(--border);
+        position: sticky;
+        top: 0;
+        z-index: 5;
+      }
+      .spacer {
+        flex: 1;
+      }
+      .btn {
+        background: #1a1a1a;
+        color: var(--bar-fg);
+        border: 1px solid var(--border);
+        padding: 0.5rem 0.8rem;
+        border-radius: 0.6rem;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: transform 0.06s ease;
+      }
+      .btn:hover {
+        background: #222;
+      }
+      .btn:active {
+        transform: scale(0.98);
+      }
+      .btn.primary {
+        background: var(--accent);
+        color: #222;
+        border-color: #e6c23d;
+        font-weight: 600;
+      }
+      .btn.ghost {
+        background: transparent;
+      }
+      .btn:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      /* Scena */
+      .stage {
+        width: min(100vw, 1100px);
+        margin: 0 auto;
+        padding: 1rem;
+        display: grid;
+        gap: 1rem;
+        place-items: center;
+      }
+      video,
+      img {
+        max-width: 100%;
+        max-height: calc(100svh - 220px);
+        width: auto;
+        height: auto;
+        display: block;
+        border: 1px solid #222;
+        background: #000;
+      }
+
+      /* Dolny panel */
+      .bottom {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 1rem;
+        align-items: center;
+        padding: 0.8rem 1rem 1.2rem;
+        background: #0b0b0b;
+        border-top: 1px solid var(--border);
+      }
+      .control {
+        color: #ccc;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+      input[type="range"] {
+        width: min(70vw, 520px);
+        accent-color: var(--accent);
+      }
+      .hint {
+        color: var(--muted);
+        font-size: 0.9rem;
+        text-align: center;
+      }
+
+      /* Cropper look */
+      .cropper-view-box,
+      .cropper-face {
+        border-radius: 0.2rem;
+      }
+      .cropper-view-box {
+        outline: 2px solid rgba(255, 255, 255, 0.9);
+      }
+      .cropper-line {
+        background-color: rgba(255, 255, 255, 0.9);
+      }
+      .cropper-point {
+        width: 10px;
+        height: 10px;
+        background: #fff;
+        opacity: 1;
+      }
+      .cropper-point.point-se,
+      .cropper-point.point-sw,
+      .cropper-point.point-ne,
+      .cropper-point.point-nw {
+        width: 12px;
+        height: 12px;
+      }
+
+      canvas {
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Pasek narzędzi -->
+    <div class="toolbar">
+      <button id="btnCancel" class="btn ghost" disabled>Cancel</button>
+      <div class="spacer"></div>
+      <button id="btnRotateLeft" class="btn" disabled>Rotate left</button>
+      <button id="btnFlipH" class="btn" disabled>Flip horizontal</button>
+      <button id="btnFlipV" class="btn" disabled>Flip vertical</button>
+      <button id="btnDone" class="btn primary" disabled>Done</button>
+    </div>
+
+    <!-- Scena -->
+    <main class="stage">
+      <!-- Przyciski startowe -->
+      <button id="btnEnableCam" class="btn primary">🎥 Włącz kamerę</button>
+      <div class="hint" id="hintCam">
+        Po włączeniu kamery kliknij „Zrób zdjęcie”. Jeśli odmówisz dostępu –
+        użyj opcji „Wgraj zdjęcie”.
+      </div>
+
+      <video
+        id="video"
+        autoplay
+        playsinline
+        muted
+        style="display: none"
+      ></video>
+      <img id="photo" alt="podgląd" style="display: none" />
+      <canvas id="work"></canvas>
+
+      <div
+        style="
+          display: flex;
+          gap: 0.75rem;
+          flex-wrap: wrap;
+          justify-content: center;
+        "
+      >
+        <button id="btnCapture" class="btn" disabled>📸 Zrób zdjęcie</button>
+        <label class="btn" for="fileInput">📁 Wgraj zdjęcie</label>
+        <input
+          id="fileInput"
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style="display: none"
+        />
+        <button id="btnSend" class="btn" disabled>📤 Wyślij do n8n</button>
+      </div>
+    </main>
+
+    <!-- Dolny panel -->
+    <div class="bottom">
+      <div class="control">
+        <label for="rotateRange">Obrót</label>
+        <input
+          id="rotateRange"
+          type="range"
+          min="-45"
+          max="45"
+          step="1"
+          value="0"
+          disabled
+        />
+        <span id="deg">0°</span>
+      </div>
+      <div class="hint">
+        Przeciągnij krawędzie, by dopasować kadr. Suwak obraca precyzyjnie.
+      </div>
+    </div>
+
+    <script>
+      // Elementy
+      const video = document.getElementById("video");
+      const img = document.getElementById("photo");
+      const canvas = document.getElementById("work");
+
+      const btnEnableCam = document.getElementById("btnEnableCam");
+      const btnCapture = document.getElementById("btnCapture");
+      const btnSend = document.getElementById("btnSend");
+
+      const btnCancel = document.getElementById("btnCancel");
+      const btnRotateLeft = document.getElementById("btnRotateLeft");
+      const btnFlipH = document.getElementById("btnFlipH");
+      const btnFlipV = document.getElementById("btnFlipV");
+      const btnDone = document.getElementById("btnDone");
+
+      const rotateRange = document.getElementById("rotateRange");
+      const degLabel = document.getElementById("deg");
+      const hintCam = document.getElementById("hintCam");
+
+      const fileInput = document.getElementById("fileInput");
+
+      let cropper = null;
+      let scaleX = 1,
+        scaleY = 1;
+      let finalBlob = null;
+      let currentObjectURL = null;
+
+      // 1) Włącz kamerę PO GESCIE UŻYTKOWNIKA
+      btnEnableCam.addEventListener("click", async () => {
+        if (!navigator.mediaDevices?.getUserMedia) {
+          alert(
+            "Twoja przeglądarka nie wspiera kamery. Użyj opcji „Wgraj zdjęcie”."
+          );
+          return;
+        }
+        if (!window.isSecureContext) {
+          alert("Strona musi działać po HTTPS.");
+          return;
+        }
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: "environment" } },
+            audio: false,
+          });
+          video.srcObject = stream;
+          video.style.display = "block";
+          btnEnableCam.style.display = "none";
+          hintCam.textContent =
+            "Kamera działa. Zrób zdjęcie kiedy kadr jest OK.";
+          btnCapture.disabled = false;
+        } catch (err) {
+          alert("Błąd dostępu do kamery: " + err.name + " — " + err.message);
+          // zostaw przycisk „Wgraj zdjęcie”
+        }
+      });
+
+      // 2) Zrób zdjęcie z kamery → crop na TYM SAMYM <img>
+      btnCapture.addEventListener("click", () => {
+        const w = video.videoWidth,
+          h = video.videoHeight;
+        if (!w || !h) return;
+
+        canvas.width = w;
+        canvas.height = h;
+        canvas.getContext("2d").drawImage(video, 0, 0, w, h);
+        img.src = canvas.toDataURL("image/jpeg", 0.92);
+        enterEditMode();
+      });
+
+      // 3) Fallback: Wgraj zdjęcie z pliku (uruchamia natywną kamerę na telefonie)
+      fileInput.addEventListener("change", (e) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+        if (currentObjectURL) URL.revokeObjectURL(currentObjectURL);
+        currentObjectURL = URL.createObjectURL(file);
+        img.src = currentObjectURL;
+        img.onload = () => {
+          URL.revokeObjectURL(currentObjectURL);
+          currentObjectURL = null;
+        };
+        enterEditMode();
+      });
+
+      function enterEditMode() {
+        img.style.display = "block";
+        video.style.display = "none";
+        hintCam.style.display = "none";
+        startCropper();
+        enableEditUI(true);
+        btnSend.disabled = true; // dopiero po „Done”
+      }
+
+      // 4) Operacje edycyjne
+      function startCropper() {
+        if (cropper) cropper.destroy();
+        scaleX = 1;
+        scaleY = 1;
+        rotateRange.value = 0;
+        degLabel.textContent = "0°";
+
+        cropper = new Cropper(img, {
+          viewMode: 1,
+          dragMode: "move",
+          background: false,
+          autoCrop: true,
+          autoCropArea: 0.85,
+          modal: true,
+          guides: true,
+          movable: true,
+          zoomable: true,
+          scalable: true,
+          rotatable: true,
+        });
+
+        rotateRange.addEventListener("input", onRotateInput);
+      }
+
+      function onRotateInput() {
+        if (!cropper) return;
+        const deg = parseInt(rotateRange.value, 10) || 0;
+        degLabel.textContent = deg + "°";
+        cropper.rotateTo(deg);
+      }
+
+      btnRotateLeft.addEventListener("click", () => {
+        if (!cropper) return;
+        const cur = parseInt(rotateRange.value, 10) || 0;
+        const next = cur - 90;
+        rotateRange.value = next;
+        degLabel.textContent = next + "°";
+        cropper.rotateTo(next);
+      });
+
+      btnFlipH.addEventListener("click", () => {
+        if (cropper) {
+          scaleX *= -1;
+          cropper.scaleX(scaleX);
+        }
+      });
+      btnFlipV.addEventListener("click", () => {
+        if (cropper) {
+          scaleY *= -1;
+          cropper.scaleY(scaleY);
+        }
+      });
+
+      btnCancel.addEventListener("click", () => {
+        if (cropper) {
+          cropper.destroy();
+          cropper = null;
+        }
+        img.style.display = "none";
+        finalBlob = null;
+        enableEditUI(false);
+        rotateRange.removeEventListener("input", onRotateInput);
+        rotateRange.value = 0;
+        degLabel.textContent = "0°";
+        // jeśli kamera działa – pokaż z powrotem
+        if (video.srcObject) {
+          video.style.display = "block";
+          hintCam.style.display = "block";
+        } else {
+          hintCam.style.display = "block";
+        }
+      });
+
+      btnDone.addEventListener("click", () => {
+        if (!cropper) return;
+        const out = cropper.getCroppedCanvas({ imageSmoothingQuality: "high" });
+        out.toBlob(
+          (blob) => {
+            finalBlob = blob;
+            img.src = out.toDataURL("image/jpeg", 0.92); // podmień TEN SAM <img>
+            cropper.destroy();
+            cropper = null;
+            enableEditUI(false);
+            rotateRange.removeEventListener("input", onRotateInput);
+            btnSend.disabled = false;
+          },
+          "image/jpeg",
+          0.92
+        );
+      });
+
+      function enableEditUI(on) {
+        btnCancel.disabled = !on;
+        btnRotateLeft.disabled = !on;
+        btnFlipH.disabled = !on;
+        btnFlipV.disabled = !on;
+        btnDone.disabled = !on;
+        rotateRange.disabled = !on;
+        btnCapture.disabled = on || !video.srcObject;
+      }
+
+      // 5) Wyślij do n8n przez Vercel Function
+      btnSend.addEventListener("click", async () => {
+        try {
+          // jeśli ktoś nie kliknął Done, wyślij aktualny kadr
+          const blob =
+            finalBlob ||
+            (await new Promise((res) => {
+              const c = cropper
+                ? cropper.getCroppedCanvas({ imageSmoothingQuality: "high" })
+                : null;
+              (c || canvas).toBlob(res, "image/jpeg", 0.92);
+            }));
+          const fd = new FormData();
+          fd.append("file", blob, "photo.jpg");
+
+          const resp = await fetch("/api/upload", { method: "POST", body: fd });
+          if (!resp.ok) throw new Error("HTTP " + resp.status);
+          alert("Wysłano zdjęcie do n8n 🎉");
+        } catch (e) {
+          alert("Błąd wysyłania: " + e.message);
+        }
+      });
+
+      // Sprzątanie streamu przy wyjściu (mobilne przeglądarki czasem trzymają kamerę)
+      window.addEventListener("pagehide", () => {
+        const stream = video.srcObject;
+        if (stream && stream.getTracks)
+          stream.getTracks().forEach((t) => t.stop());
+      });
+    </script>
+  </body>
+</html>
