@@ -2,16 +2,50 @@
 <html lang="pl">
   <head>
     <meta charset="UTF-8" />
-    <title>Kamera → Przytnij → Wyślij do n8n</title>
-
-    <!-- Cropper.js -->
+    <title>Paragonizm</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css"
     />
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
-
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        margin: 0;
+        font-family: sans-serif;
+        background: #000;
+        color: #eee;
+      }
+      .screen {
+        display: none;
+        padding: 1rem;
+      }
+      .screen.active {
+        display: block;
+      }
+      .menu-btn {
+        display: block;
+        margin: 1rem auto;
+        padding: 1rem 2rem;
+        font-size: 1.2rem;
+      }
+      input,
+      select {
+        width: 100%;
+        padding: 0.5rem;
+        margin: 0.5rem 0;
+        font-size: 1rem;
+      }
+      label {
+        display: block;
+        margin-top: 0.8rem;
+      }
+      button {
+        padding: 0.6rem 1rem;
+        margin-top: 1rem;
+        font-size: 1rem;
+      }
+    </style>
     <style>
       :root {
         --bar-bg: #111;
@@ -155,76 +189,165 @@
     </style>
   </head>
   <body>
-    <!-- Pasek narzędzi -->
-    <div class="toolbar">
-      <button id="btnCancel" class="btn ghost" disabled>Cancel</button>
-      <div class="spacer"></div>
-      <button id="btnRotateLeft" class="btn" disabled>Rotate left</button>
-      <button id="btnFlipH" class="btn" disabled>Flip horizontal</button>
-      <button id="btnFlipV" class="btn" disabled>Flip vertical</button>
-      <button id="btnDone" class="btn primary" disabled>Done</button>
+    <!-- WIDOK GŁÓWNY -->
+    <div id="screen-home" class="screen active">
+      <h1>Paragonizm</h1>
+      <button class="menu-btn" id="btnGoCamera">
+        📸 Dodaj zdjęcie paragonu
+      </button>
+      <button class="menu-btn" id="btnGoManual">
+        ✍️ Dodaj wydatek ręcznie
+      </button>
     </div>
 
-    <!-- Scena -->
-    <main class="stage">
-      <!-- Przyciski startowe -->
-      <button id="btnEnableCam" class="btn primary">🎥 Włącz kamerę</button>
-      <div class="hint" id="hintCam">
-        Po włączeniu kamery kliknij „Zrób zdjęcie”. Jeśli odmówisz dostępu –
-        użyj opcji „Wgraj zdjęcie”.
+    <!-- WIDOK KAMERA -->
+    <div id="screen-camera" class="screen">
+      <button onclick="goHome()">⬅️ Wróć</button>
+      <h2>Dodaj zdjęcie paragonu</h2>
+      <!-- tutaj wklej cały swój kod z kamerą + cropperem + uploadem -->
+      <div id="camera-root">
+        <!-- np. video/img/canvas, toolbar itd. -->
+      </div>
+      <!-- Pasek narzędzi -->
+      <div class="toolbar">
+        <button id="btnCancel" class="btn ghost" disabled>Cancel</button>
+        <div class="spacer"></div>
+        <button id="btnRotateLeft" class="btn" disabled>Rotate left</button>
+        <button id="btnFlipH" class="btn" disabled>Flip horizontal</button>
+        <button id="btnFlipV" class="btn" disabled>Flip vertical</button>
+        <button id="btnDone" class="btn primary" disabled>Done</button>
       </div>
 
-      <video
-        id="video"
-        autoplay
-        playsinline
-        muted
-        style="display: none"
-      ></video>
-      <img id="photo" alt="podgląd" style="display: none" />
-      <canvas id="work"></canvas>
+      <!-- Scena -->
+      <main class="stage">
+        <!-- Przyciski startowe -->
+        <button id="btnEnableCam" class="btn primary">🎥 Włącz kamerę</button>
+        <div class="hint" id="hintCam">
+          Po włączeniu kamery kliknij „Zrób zdjęcie”. Jeśli odmówisz dostępu –
+          użyj opcji „Wgraj zdjęcie”.
+        </div>
 
-      <div
-        style="
-          display: flex;
-          gap: 0.75rem;
-          flex-wrap: wrap;
-          justify-content: center;
-        "
-      >
-        <button id="btnCapture" class="btn" disabled>📸 Zrób zdjęcie</button>
-        <label class="btn" for="fileInput">📁 Wgraj zdjęcie</label>
-        <input
-          id="fileInput"
-          type="file"
-          accept="image/*"
-          capture="environment"
+        <video
+          id="video"
+          autoplay
+          playsinline
+          muted
           style="display: none"
-        />
-        <button id="btnSend" class="btn" disabled>📤 Wyślij do n8n</button>
-      </div>
-    </main>
+        ></video>
+        <img id="photo" alt="podgląd" style="display: none" />
+        <canvas id="work"></canvas>
 
-    <!-- Dolny panel -->
-    <div class="bottom">
-      <div class="control">
-        <label for="rotateRange">Obrót</label>
-        <input
-          id="rotateRange"
-          type="range"
-          min="-45"
-          max="45"
-          step="1"
-          value="0"
-          disabled
-        />
-        <span id="deg">0°</span>
-      </div>
-      <div class="hint">
-        Przeciągnij krawędzie, by dopasować kadr. Suwak obraca precyzyjnie.
+        <div
+          style="
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+            justify-content: center;
+          "
+        >
+          <button id="btnCapture" class="btn" disabled>📸 Zrób zdjęcie</button>
+          <label class="btn" for="fileInput">📁 Wgraj zdjęcie</label>
+          <input
+            id="fileInput"
+            type="file"
+            accept="image/*"
+            capture="environment"
+            style="display: none"
+          />
+          <button id="btnSend" class="btn" disabled>📤 Wyślij do n8n</button>
+        </div>
+      </main>
+
+      <!-- Dolny panel -->
+      <div class="bottom">
+        <div class="control">
+          <label for="rotateRange">Obrót</label>
+          <input
+            id="rotateRange"
+            type="range"
+            min="-45"
+            max="45"
+            step="1"
+            value="0"
+            disabled
+          />
+          <span id="deg">0°</span>
+        </div>
+        <div class="hint">
+          Przeciągnij krawędzie, by dopasować kadr. Suwak obraca precyzyjnie.
+        </div>
       </div>
     </div>
 
+    <!-- WIDOK FORMULARZ -->
+    <div id="screen-form" class="screen">
+      <button onclick="goHome()">⬅️ Wróć</button>
+      <h2>Dodaj wydatek ręcznie</h2>
+      <form id="manualForm">
+        <label
+          >Nazwa
+          <input type="text" name="nazwa" required />
+        </label>
+        <label
+          >Koszt
+          <input type="number" name="koszt" step="0.01" required />
+        </label>
+        <label
+          >Kategoria
+          <input type="text" name="kategoria" required />
+        </label>
+        <label
+          >Data
+          <input type="date" name="data" id="fieldData" required />
+        </label>
+        <button type="submit">📤 Wyślij do n8n</button>
+      </form>
+    </div>
+
+    <script>
+      // nawigacja ekranami
+      const screens = {
+        home: document.getElementById("screen-home"),
+        camera: document.getElementById("screen-camera"),
+        form: document.getElementById("screen-form"),
+      };
+      function showScreen(name) {
+        Object.values(screens).forEach((s) => s.classList.remove("active"));
+        screens[name].classList.add("active");
+      }
+      function goHome() {
+        showScreen("home");
+      }
+
+      document.getElementById("btnGoCamera").onclick = () =>
+        showScreen("camera");
+      document.getElementById("btnGoManual").onclick = () => showScreen("form");
+
+      // ustal dzisiejszą datę domyślnie
+      const today = new Date().toISOString().split("T")[0];
+      document.getElementById("fieldData").value = today;
+
+      // obsługa formularza manualnego
+      document
+        .getElementById("manualForm")
+        .addEventListener("submit", async (e) => {
+          e.preventDefault();
+          const data = Object.fromEntries(new FormData(e.target).entries());
+
+          try {
+            const resp = await fetch("/api/upload", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ manual: true, ...data }),
+            });
+            if (!resp.ok) throw new Error("HTTP " + resp.status);
+            alert("Wydatek wysłany ✅");
+            goHome();
+          } catch (err) {
+            alert("Błąd: " + err.message);
+          }
+        });
+    </script>
     <script>
       // Elementy
       const video = document.getElementById("video");
